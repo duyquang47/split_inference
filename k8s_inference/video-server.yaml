@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: video-server
+  labels:
+    app: video-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: video-server
+  template:
+    metadata:
+      labels:
+        app: video-server
+    spec:
+      containers:
+      - name: video-server
+        imagePullPolicy: IfNotPresent
+        image: quang47/video_server
+        ports:
+        - containerPort: 5000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: video-server
+spec:
+  selector:
+    app: video-server
+  ports:
+  - port: 5000
+    targetPort: 5000
+  type: ClusterIP 

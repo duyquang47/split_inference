@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: split-inference-layer1
+  labels:
+    app: split-inference-layer1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: split-inference-layer1
+  template:
+    metadata:
+      labels:
+        app: split-inference-layer1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+        prometheus.io/scheme: "http"
+    spec:
+      containers:
+      - name: layer1
+        image: quang47/inference_client
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c", "sleep 20 && python client.py --layer_id 1 --device cpu"]
+        ports:
+        - containerPort: 8001
+          name: metrics
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+        - name: logs-volume
+          mountPath: /app/logs
+        env:
+        - name: PYTHONPATH
+          value: "/app"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "300m"
+          limits:
+            memory: "2Gi"
+            cpu: "2"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: split-inference-config
+      - name: logs-volume
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: split-inference-layer1
+  namespace: default
+  labels:
+    app: split-inference-layer1
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+    prometheus.io/scheme: "http"
+spec:
+  selector:
+    app: split-inference-layer1
+  ports:
+  - port: 8001
+    targetPort: 8001
+    name: metrics
+  type: ClusterIP

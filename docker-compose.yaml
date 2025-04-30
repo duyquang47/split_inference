@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  video_server:
+    image: quang47/video_server
+    container_name: video_server
+    ports:
+      - "5000:5000"
+    networks:
+      - inference
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    volumes:
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/limits.conf:/etc/security/limits.conf
+    networks:
+      - inference
+
+  server:
+    image: quang47/inference_server
+    container_name: server
+    depends_on:
+      - rabbitmq
+      - video_server
+    environment:
+      - PYTHONPATH=/app
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASSWORD=admin
+      - VIDEO_SERVER_URL=http://video_server:5000/video
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    networks:
+      - inference
+    command: ["sh", "-c", "sleep 10 && python server.py"]
+
+  client_layer1:
+    image: quang47/inference_client
+    container_name: client_layer1
+    ports:
+      - "8001:8001"
+    depends_on:
+      - rabbitmq
+      - server
+      - video_server
+    environment:
+      - PYTHONPATH=/app
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASSWORD=admin
+      - VIDEO_SERVER_URL=http://video_server:5000/video
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    networks:
+      - inference
+    command: ["sh", "-c", "sleep 20 && python client.py --layer_id 1 --device cpu"]
+
+  client_layer2:
+    image: quang47/inference_client
+    container_name: client_layer2
+    ports:
+      - "8002:8002"
+    depends_on:
+      - rabbitmq
+      - server
+      - video_server
+    environment:
+      - PYTHONPATH=/app
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASSWORD=admin
+      - VIDEO_SERVER_URL=http://video_server:5000/video
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    networks:
+      - inference
+    command: ["sh", "-c", "sleep 20 && python client.py --layer_id 2 --device cpu"]
+
+# mkdir /prometheus-docker/ and edit prometheus.yml 
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ../prometheus-docker/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - inference
+
+networks:
+  inference:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+    driver: local
