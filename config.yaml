@@ -7,7 +7,7 @@ server:
   model: yolov8n
   batch-frame: 1
 rabbit:
-  address: 127.0.0.1
+  address: rabbitmq
   username: admin
   password: admin
   virtual-host: /
