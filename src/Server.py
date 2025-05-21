@@ -9,7 +9,7 @@ import torch.nn as nn
 import src.Model
 import src.Log
 
-#cong dung server: doc config, gui config den client, ghi log
+#công dụng server: thiết lập kết nối với client, đọc config, gửi config đến client
 class Server:
     def __init__(self, config):
         address = config["rabbit"]["address"]
@@ -34,7 +34,7 @@ class Server:
         self.channel.basic_consume(
             queue='rpc_queue', on_message_callback=self.on_request
         )
-        #khoi tao channel de reply client
+        #khởi tạo channel reply REGISTER client 
         self.reply_channel = self.connection.channel()
 
         self.register_clients = [0 for _ in range(len(self.total_clients))]
@@ -44,25 +44,24 @@ class Server:
         self.debug_mode = config["debug-mode"]
         log_path = config["log-path"]
 
-        #khoi tao log
+        #khởi tạo log
         self.logger = src.Log.Logger(f"{log_path}/app.log")
         self.logger.log_info(
             f"Application start. Server is waiting for {self.total_clients} clients."
         )
 
     def start(self):
-        #bat dau nhan message tu rpc_queue
+        #bắt đầu nhận message từ rpc_queue
         self.channel.start_consuming()
 
     def on_request(self, ch, method, props, body):
-        #xu ly REGISTER message tu client
+        #xử lý REGISTER message từ client
         message = pickle.loads(body)
         action = message.get("action")
         client_id = message.get("client_id")
         layer_id = message.get("layer_id")
 
         if action == "REGISTER":
-            #dang ky client neu chua co
             entry = (str(client_id), layer_id)
             if entry not in self.list_clients:
                 self.list_clients.append(entry)
@@ -70,10 +69,10 @@ class Server:
             src.Log.print_with_color(
                 f"[<<<] Received message from client: {message}", "blue"
             )
-            #tang bo dem cho client
+            #tăng bộ đếm cho client
             self.register_clients[layer_id - 1] += 1
 
-            #du client, ghi log
+            #đủ client, ghi log
             if self.register_clients == self.total_clients:
                 src.Log.print_with_color(
                     "All clients are connected. Sending notifications.", "green"
@@ -83,7 +82,7 @@ class Server:
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def notify_clients(self):
-        #xac dinh diem cat, load model va gui START den client
+        #xác định điểm cắt, load model và gửi START đến client
         default_splits = {
             "a": (10, [4, 6, 9]),
             "b": (16, [9, 12, 15]),
@@ -121,7 +120,7 @@ class Server:
             self.send_to_response(client_id, pickle.dumps(response))
 
     def send_to_response(self, client_id, message):
-        #gui config da load den cac client thong qua queue rieng
+        #gửi thông báo đến client
         reply_queue = f"reply_{client_id}"
         self.reply_channel.queue_declare(reply_queue, durable=False)
         src.Log.print_with_color(

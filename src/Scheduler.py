@@ -1,3 +1,5 @@
+#module định nghĩa chức năng mỗi layer và phương thức giao tiếp giữa các layer thông qua queue
+
 import pickle
 import time
 from tqdm import tqdm
@@ -19,7 +21,7 @@ class Scheduler:
         self.layer_id = layer_id
         self.channel = channel
         self.device = device
-        self.intermediate_queue = f"intermediate_queue_{self.layer_id}"
+        self.intermediate_queue = "intermediate_queue"
         self.channel.queue_declare(self.intermediate_queue, durable=False)
 
         # Initialize metrics
@@ -40,7 +42,7 @@ class Scheduler:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.bind(('0.0.0.0', prometheus_port))  # Bind to all interfaces
                 sock.close()
-                #start server prometheus tai 2 port 8001 va 8002
+                #start server prometheus tại 2 port 8001 và 8002
                 start_http_server(prometheus_port) 
                 logging.info(f"Started Prometheus metrics server for layer {layer_id} on port {prometheus_port}")
             except OSError as e:
@@ -55,6 +57,8 @@ class Scheduler:
         else:
             logging.warning(f"No Prometheus port configured for layer {layer_id}")
 
+    #hàm mã hóa dữ liệu thành byte để gửi đi và giải mã trở vể sử dụng pickle
+    #sử dụng cơ chế basic.publish() của queue
     def send_next_layer(self, intermediate_queue, data, logger):
         if data != 'STOP':
             data["layers_output"] = [t.cpu() if isinstance(t, torch.Tensor) else None for t in data["layers_output"]]
@@ -62,7 +66,6 @@ class Scheduler:
                 "action": "OUTPUT",
                 "data": data
             })
-
             self.channel.basic_publish(
                 exchange='',
                 routing_key=intermediate_queue,
@@ -81,9 +84,9 @@ class Scheduler:
         input_image = []
         predictor = SplitDetectionPredictor(model, overrides={"imgsz": 640})
 
-        model.eval() #set che do inference
-        model.to(self.device) #dua model vao device doc o command
-        
+        model.eval() #set chế độ inference
+        model.to(self.device) #đưa model vào device đọc ở command
+
         # Stream video directly from video server
         video_url = data
         cap = cv2.VideoCapture(video_url)
@@ -95,8 +98,8 @@ class Scheduler:
         logger.log_info(f"FPS input: {fps}")
         pbar = tqdm(desc="Processing video (while loop)", unit="frame")
 
-        total_frames = 0 #khoi tao bien dem so frame
-        total_processing_time = 0 #khoi tao bien dem thoi gian
+        total_frames = 0 #khởi tạo biến đếm frame
+        total_processing_time = 0 #khởi tạo biến đếm thời gian
 
         while True:
             ret, frame = cap.read()
@@ -146,63 +149,58 @@ class Scheduler:
         logger.log_info(f"Total Input Frames: {metrics_summary['input_frames']}")
         logger.log_info(f"Total Output Frames: {metrics_summary['output_frames']}")
         logger.log_info(f"Frame Drop Rate: {metrics_summary['drop_rate']}")
-
         logger.log_info(f"End Inference.")
         return time_inference
 
-    def last_layer(self, model, batch_frame, logger):
-        time_inference = 0
-        predictor = SplitDetectionPredictor(model, overrides={"imgsz": 640})
+    def last_layer_callback(self, ch, method, properties, body):
+        received_data = pickle.loads(body)
+        if received_data != 'STOP':
+            # Xử lý logic như trong while True cũ
+            self.frame_metrics.update_input_frames(self.batch_frame)
+            y = received_data["data"]
+            y["layers_output"] = [t.to(self.device) if t is not None else None for t in y["layers_output"]]
+            start = time.perf_counter()
+            predictions = self.model.forward_tail(y)
+            batch_processing_time = time.perf_counter() - start
+            self.time_inference += batch_processing_time
+            self.total_processing_time += batch_processing_time
+            self.total_frames += self.batch_frame
+            self.fps_metrics.update_batch_metrics(self.batch_frame, batch_processing_time)
+            self.fps_metrics.update_metrics(self.batch_frame, batch_processing_time, self.logger)
+            self.frame_metrics.update_output_frames(self.batch_frame)
+            self.pbar.update(self.batch_frame)
+        else:
+            self.pbar.close()
+            ch.stop_consuming()
 
-        model.eval()
-        model.to(self.device)
-        last_queue = f"intermediate_queue_{self.layer_id - 1}"
+    def last_layer(self, model, batch_frame, logger):
+        self.model = model
+        self.batch_frame = batch_frame
+        self.logger = logger
+        self.time_inference = 0
+        self.total_processing_time = 0
+        self.total_frames = 0
+        self.pbar = tqdm(desc="Processing video (while loop)", unit="frame")
+
+        last_queue = "intermediate_queue"
         self.channel.queue_declare(queue=last_queue, durable=False)
         self.channel.basic_qos(prefetch_count=50)
-        pbar = tqdm(desc="Processing video (while loop)", unit="frame")
+        self.channel.basic_consume(
+            queue=last_queue,
+            on_message_callback=self.last_layer_callback,
+            auto_ack=True
+        )
+        logger.log_info("Waiting for messages. To exit press CTRL+C")
+        self.channel.start_consuming()
 
-        total_frames = 0
-        total_processing_time = 0
-
-        while True:
-            method_frame, header_frame, body = self.channel.basic_get(queue=last_queue, auto_ack=True)
-            if method_frame and body:
-                received_data = pickle.loads(body)
-                if received_data != 'STOP':
-                    # Update input frame count
-                    self.frame_metrics.update_input_frames(batch_frame)
-
-                    y = received_data["data"]
-                    y["layers_output"] = [t.to(self.device) if t is not None else None for t in y["layers_output"]]
-                    start = time.perf_counter()
-
-                    predictions = model.forward_tail(y)
-
-                    batch_processing_time = time.perf_counter() - start
-                    time_inference += batch_processing_time
-                    total_processing_time += batch_processing_time
-                    total_frames += batch_frame
-
-                    # Update metrics
-                    self.fps_metrics.update_batch_metrics(batch_frame, batch_processing_time)
-                    self.fps_metrics.update_metrics(batch_frame, batch_processing_time, logger)
-                    self.frame_metrics.update_output_frames(batch_frame)
-
-                    pbar.update(batch_frame)
-                else:
-                    break
-
-        pbar.close()
-
-        # Log frame metrics summary
+        # Sau khi stop_consuming, log metrics như cũ
         metrics_summary = self.frame_metrics.get_metrics_summary()
         logger.log_info(f"Frame Metrics Summary for Layer {self.layer_id}:")
         logger.log_info(f"Total Input Frames: {metrics_summary['input_frames']}")
         logger.log_info(f"Total Output Frames: {metrics_summary['output_frames']}")
         logger.log_info(f"Frame Drop Rate: {metrics_summary['drop_rate']}")
-
         logger.log_info(f"End Inference.")
-        return time_inference
+        return self.time_inference
 
     def middle_layer(self, model):
         pass

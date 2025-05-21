@@ -1,3 +1,5 @@
+#module xử lý queue cũ
+
 import pika
 from requests.auth import HTTPBasicAuth
 import requests

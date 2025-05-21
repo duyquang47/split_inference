@@ -8,8 +8,8 @@ data:
     server:
       cut-layer: a #or b, c
       clients:
-        - 1
-        - 1
+        - 2
+        - 2
       model: yolov8n
       batch-frame: 1
     rabbit:

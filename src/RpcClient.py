@@ -1,3 +1,11 @@
+"""
+module thiết lập kết nối giữa server và client
+cơ chế giao tiếp sử dụng là publish và consume message, trong đó:
+- client publish message REGISTER đến server để đăng ký
+- server consume message REGISTER từ client
+- server publish message START đến client, trong đó chứa config gửi đến client
+- client consume message START từ server, thực hiện load config và ghi log
+"""
 import pickle
 import time
 import base64
@@ -30,6 +38,7 @@ class RpcClient:
         self.logger = None
         self.connect()
 
+    #client đợi message START từ server
     def wait_response(self):
         status = True
         reply_queue_name = f"reply_{self.client_id}"
@@ -40,6 +49,7 @@ class RpcClient:
                 status = self.response_message(body)
             time.sleep(0.5)
 
+    #nhận message START từ server -> load config từ server
     def response_message(self, body):
         self.response = pickle.loads(body)
         src.Log.print_with_color(f"[<<<] Client received: {self.response['message']}", "blue")
@@ -81,15 +91,16 @@ class RpcClient:
         else:
             return False
 
+    #thiết lập kết nối đến rabbitmq
     def connect(self):
         credentials = pika.PlainCredentials(self.username, self.password)
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(self.address, 5672, self.virtual_host, credentials))
         self.channel = self.connection.channel()
 
+    #client sử dụng cơ chế publish để gửi REGISTER đến server
     def send_to_server(self, message):
         self.connect()
         self.channel.queue_declare('rpc_queue', durable=False)
         self.channel.basic_publish(exchange='',
                                    routing_key='rpc_queue',
                                    body=pickle.dumps(message))
-

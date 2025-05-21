@@ -5,7 +5,7 @@ metadata:
   labels:
     app: split-inference-layer1
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: split-inference-layer1
