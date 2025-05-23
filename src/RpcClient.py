@@ -38,6 +38,12 @@ class RpcClient:
         self.logger = None
         self.connect()
 
+        self.send_to_server({
+            "action": "REGISTER",
+            "client_id": self.client_id,
+            "layer_id": self.layer_id
+        })
+
     #client đợi message START từ server
     def wait_response(self):
         status = True
