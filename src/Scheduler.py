@@ -80,10 +80,10 @@ class Scheduler:
         input_image = []
         predictor = SplitDetectionPredictor(model, overrides={"imgsz": 640})
 
-        model.eval() #set chế độ inference
-        model.to(self.device) #đưa model vào device đọc ở command
+        model.eval()
+        model.to(self.device)
 
-        # Stream video directly from video server
+        #stream video từ video_server
         video_url = data
         cap = cv2.VideoCapture(video_url)
         if not cap.isOpened():
@@ -100,8 +100,9 @@ class Scheduler:
         while True:
             ret, frame = cap.read()
             if not ret:
-                # Gửi 1 STOP, server sẽ gửi đúng số lượng STOP cho các client last layer
-                self.send_next_layer(self.intermediate_queue, 'STOP', logger)
+                #gửi STOP nhiều hơn số pod scale dự kiến
+                for _ in range(10):
+                    self.send_next_layer(self.intermediate_queue, 'STOP', logger)
                 break
 
             frame = cv2.resize(frame, (640, 640))
