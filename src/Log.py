@@ -1,5 +1,4 @@
-import logging
-
+""" Module xử lý logging với màu sắc """
 
 class Colors:
     COLORS = {
@@ -11,43 +10,33 @@ class Colors:
         "end": '\033[0m'
     }
 
-
-class Logger:
-    def __init__(self, log_path, debug_mode=False):
-        # Thiết lập logger với tên "my_logger"
-        self.logger = logging.getLogger("my_logger")
-        self.logger.setLevel(logging.DEBUG)  # Mức log
-        self.debug_mode = debug_mode
-
-        # Tạo file handler để ghi log vào file
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setLevel(logging.DEBUG)
-
-        # Định dạng log
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-
-        # Gắn file handler vào logger
-        self.logger.addHandler(file_handler)
-
-    def log_info(self, message):
-        print(f"[INFO] {message}")
-        self.logger.info(message)
-
-    def log_warning(self, message):
-        print_with_color(f"[WARN] {message}", "yellow")
-        self.logger.warning(message)
-
-    def log_error(self, message):
-        print_with_color(f"[ERROR] {message}", "red")
-        self.logger.error(message)
-
-    def log_debug(self, message):
-        if self.debug_mode:
-            print_with_color(f"[DEBUG] {message}", "green")
-            self.logger.debug(message)
-
-
-def print_with_color(text, color):
+def print_with_color(text: str, color: str) -> None:
+    """
+    In text với màu sắc.
+    Args:
+        text: Text cần in
+        color: Màu sắc (header, blue, green, yellow, red)
+    """
     color_code = Colors.COLORS.get(color.lower(), Colors.COLORS["end"])
     print(f"{color_code}{text}{Colors.COLORS['end']}")
+
+def log_success(text: str) -> None:
+    """ Success log with green color """
+    print_with_color(f"[SUCCESS] {text}", "green")
+
+def log_info(text: str) -> None:
+    """ Info log with blue color """
+    print_with_color(f"[INFO] {text}", "blue")
+
+def log_warning(text: str) -> None:
+    """ Warning log with yellow color """
+    print_with_color(f"[WARN] {text}", "yellow")
+
+def log_error(text: str) -> None:
+    """ Error log with red color """
+    print_with_color(f"[ERROR] {text}", "red")
+
+def log_debug(text: str, debug_mode: bool = False) -> None:
+    """ Debug log with green color if debug_mode=True """
+    if debug_mode:
+        print_with_color(f"[DEBUG] {text}", "green")
