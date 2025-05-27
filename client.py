@@ -1,50 +1,112 @@
+"""
+Module khởi tạo client.
+"""
 import pika
 import uuid
 import argparse
 import yaml
-
+import sys
 import torch
 
 import src.Log
 from src.RpcClient import RpcClient
 from src.Scheduler import Scheduler
 
-parser = argparse.ArgumentParser(description="Split learning framework")
-parser.add_argument('--layer_id', type=int, required=True, help='ID of layer, start from 1')
-parser.add_argument('--device', type=str, required=False, help='Device of client')
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(description="Split learning framework")
+    parser.add_argument('--layer_id', type=int, required=True, help='ID of layer, start from 1')
+    parser.add_argument('--device', type=str, required=False, help='Device of client')
+    return parser.parse_args()
 
-args = parser.parse_args()
+def load_config():
+    """Load and validate configuration file"""
+    try:
+        with open('config.yaml', 'r') as file:
+            return yaml.safe_load(file)
+    except FileNotFoundError:
+        src.Log.log_error("config.yaml not found")
+        sys.exit(1)
+    except yaml.YAMLError as e:
+        src.Log.log_error(f"Error parsing config.yaml: {e}")
+        sys.exit(1)
 
-with open('config.yaml', 'r') as file:
-    config = yaml.safe_load(file)
-
-client_id = uuid.uuid4()
-address = config["rabbit"]["address"]
-username = config["rabbit"]["username"]
-password = config["rabbit"]["password"]
-virtual_host = config["rabbit"]["virtual-host"]
-
-device = None
-
-if args.device is None:
-    if torch.cuda.is_available():
-        device = "cuda"
-        print(f"Using device: {torch.cuda.get_device_name(device)}")
+def setup_device(device_arg):
+    """Setup and validate device for client"""
+    if device_arg is None:
+        if torch.cuda.is_available():
+            device = "cuda"
+            src.Log.log_info(f"Using device: {torch.cuda.get_device_name(device)}")
+        else:
+            device = "cpu"
+            src.Log.log_info("Using device: CPU")
     else:
-        device = "cpu"
-        print(f"Using device: CPU")
-else:
-    device = args.device
-    print(f"Using device: {device}")
+        device = device_arg
+        src.Log.log_info(f"Using device: CPU")
+    return device
 
-credentials = pika.PlainCredentials(username, password)
-connection = pika.BlockingConnection(pika.ConnectionParameters(address, 5672, f'{virtual_host}', credentials))
-channel = connection.channel()
+def setup_rabbitmq_connection(config):
+    """Setup RabbitMQ connection"""
+    try:
+        credentials = pika.PlainCredentials(
+            config["rabbit"]["username"],
+            config["rabbit"]["password"]
+        )
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters(
+                config["rabbit"]["address"],
+                5672,
+                config["rabbit"]["virtual-host"],
+                credentials
+            )
+        )
+        channel = connection.channel()
+        return channel
+    except pika.exceptions.AMQPConnectionError as e:
+        src.Log.log_error(f"Failed to connect to RabbitMQ: {e}")
+        sys.exit(1)
+    except Exception as e:
+        src.Log.log_error(f"Unexpected error during connection setup: {e}")
+        sys.exit(1)
+
+def main():
+    """Main function to initialize and start client"""
+    try:
+        """ Parse arguments and load configuration """
+        args = parse_arguments()
+        config = load_config()
+        
+        """ Setup device and generate client ID """
+        device = setup_device(args.device)
+        client_id = uuid.uuid4()
+        
+        """ Setup RabbitMQ connection """
+        channel = setup_rabbitmq_connection(config)
+        
+        """ Initialize and start client """
+        src.Log.log_info("Initializing client...")
+        scheduler = Scheduler(client_id, args.layer_id, channel, device)
+        client = RpcClient(
+            client_id,
+            args.layer_id,
+            config["rabbit"]["address"],
+            config["rabbit"]["username"],
+            config["rabbit"]["password"],
+            config["rabbit"]["virtual-host"],
+            scheduler.inference_func,
+            device
+        )
+        
+        src.Log.log_info("Sending registration message to server...")
+        client._setup_connection()
+        client._register_with_server()
+        client.wait_response()
+        
+    except KeyboardInterrupt:
+        src.Log.log_info("Client shutdown initiated")
+    except Exception as e:
+        src.Log.log_error(f"Unexpected error: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    src.Log.print_with_color("[>>>] Client sending registration message to server...", "red")
-    data = {"action": "REGISTER", "client_id": client_id, "layer_id": args.layer_id, "message": "Hello from Client!"}
-    scheduler = Scheduler(client_id, args.layer_id, channel, device)
-    client = RpcClient(client_id, args.layer_id, address, username, password, virtual_host, scheduler.inference_func, device)
-    client.send_to_server(data)
-    client.wait_response()
+    main()
