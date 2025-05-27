@@ -6,27 +6,40 @@ from src.Utils import delete_old_queues
 import src.Log
 import yaml
 
-parser = argparse.ArgumentParser(description="Split learning framework with controller.")
-args = parser.parse_args()
-
-with open('config.yaml') as file:
-    config = yaml.safe_load(file)
-
-address = config["rabbit"]["address"]
-username = config["rabbit"]["username"]
-password = config["rabbit"]["password"]
-virtual_host = config["rabbit"]["virtual-host"]
-
+def load_config():
+    try:
+        with open('config.yaml') as file:
+            return yaml.safe_load(file)
+    except FileNotFoundError:
+        src.Log.log_error("config.yaml not found")
+        sys.exit(1)
+    except yaml.YAMLError as e:
+        src.Log.log_error(f"Error parsing config.yaml: {e}")
+        sys.exit(1)
 
 def signal_handler(sig, frame):
-    print("\nCatch stop signal Ctrl+C. Stop the program.")
-    delete_old_queues(address, username, password, virtual_host)
+    src.Log.log_info("Received stop signal (Ctrl+C). Cleaning up...")
+    try:
+        delete_old_queues(address, username, password, virtual_host)
+        src.Log.log_success("Cleanup completed successfully")
+    except Exception as e:
+        src.Log.log_error(f"Error during cleanup: {e}")
     sys.exit(0)
 
-
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, signal_handler)
-    delete_old_queues(address, username, password, virtual_host)
-    server = Server(config)
-    server.start()
-    src.Log.print_with_color("Ok, ready!", "green")
+    try:
+        config = load_config()
+        address = config["rabbit"]["address"]
+        username = config["rabbit"]["username"]
+        password = config["rabbit"]["password"]
+        virtual_host = config["rabbit"]["virtual-host"]
+
+        signal.signal(signal.SIGINT, signal_handler)
+        delete_old_queues(address, username, password, virtual_host)
+        
+        server = Server(config)
+        server.start()
+        src.Log.log_info("Server is ready and waiting for clients")
+    except Exception as e:
+        src.Log.log_error(f"Failed to start server: {e}")
+        sys.exit(1)
