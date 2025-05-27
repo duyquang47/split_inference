@@ -68,4 +68,4 @@ class FPSMetrics:
         
         """ Update processing time metrics """
         self.processing_time.labels(client_id=self.client_id).set(batch_processing_time)
-        self.total_processing_time.labels(client_id=self.client_id).inc(batch_processing_time) 
+        self.total_processing_time.labels(client_id=self.client_id).inc(batch_processing_time)
