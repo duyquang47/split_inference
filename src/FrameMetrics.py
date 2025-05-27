@@ -5,7 +5,7 @@ class FrameMetrics:
         self.layer_id = layer_id
         self.client_id = client_id
         
-        # Initialize Prometheus metrics
+        """ Initialize Prometheus metrics """
         self.input_frames = Counter(
             f'layer_{layer_id}_input_frames',
             f'Total input frames for layer {layer_id}',
@@ -24,7 +24,7 @@ class FrameMetrics:
             ['client_id']
         )
         
-        # Initialize counters
+        """ Initialize counters """
         self.total_input_frames = 0
         self.total_output_frames = 0
 
