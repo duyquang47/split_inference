@@ -26,7 +26,9 @@ services:
       - inference
 
   server:
-    image: quang47/inference_server
+    build:
+      context: .
+      dockerfile: Dockerfile.server
     container_name: server
     depends_on:
       - rabbitmq
@@ -46,7 +48,9 @@ services:
     command: ["sh", "-c", "sleep 10 && python server.py"]
 
   client_layer1:
-    image: quang47/inference_client
+    build:
+      context: .
+      dockerfile: Dockerfile.client
     container_name: client_layer1
     ports:
       - "8001:8001"
@@ -60,6 +64,7 @@ services:
       - RABBITMQ_PASSWORD=admin
       - VIDEO_SERVER_URL=http://video_server:5000/video
       - PYTHONUNBUFFERED=1
+      - PROMETHEUS_PORT=8001
     volumes:
       - ./config.yaml:/app/config.yaml
     networks:
@@ -67,7 +72,9 @@ services:
     command: ["sh", "-c", "sleep 20 && python client.py --layer_id 1 --device cpu"]
 
   client_layer2:
-    image: quang47/inference_client
+    build:
+      context: .
+      dockerfile: Dockerfile.client
     container_name: client_layer2
     ports:
       - "8002:8002"
@@ -81,6 +88,7 @@ services:
       - RABBITMQ_PASSWORD=admin
       - VIDEO_SERVER_URL=http://video_server:5000/video
       - PYTHONUNBUFFERED=1
+      - PROMETHEUS_PORT=8002
     volumes:
       - ./config.yaml:/app/config.yaml
     networks:
