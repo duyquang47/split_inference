@@ -95,6 +95,7 @@ class Scheduler:
         self.fps_metrics.update_metrics(batch_frame, batch_processing_time, debug_mode)
 
     def first_layer(self, model, data, save_layers, batch_frame, debug_mode=False):
+        src.Log.log_info(f"[Layer {self.layer_id}] Starting first layer processing with batch size {batch_frame}")
         time_inference = 0
         input_image = []
         predictor = SplitDetectionPredictor(model, overrides={"imgsz": 640})
@@ -104,19 +105,21 @@ class Scheduler:
 
         cap = cv2.VideoCapture(data)
         if not cap.isOpened():
-            src.Log.log_error(f"Could not open video stream from {data}")
+            src.Log.log_error(f"[Layer {self.layer_id}] Could not open video stream from {data}")
             return False
 
         fps = cap.get(cv2.CAP_PROP_FPS)
-        src.Log.log_info(f"FPS input: {fps}")
+        src.Log.log_info(f"[Layer {self.layer_id}] Video FPS: {fps}")
 
         total_frames = 0
         total_processing_time = 0
+        batches_processed = 0
 
         try:
             while True:
                 ret, frame = cap.read()
                 if not ret:
+                    src.Log.log_info(f"[Layer {self.layer_id}] End of video stream. Total frames processed: {total_frames}")
                     for _ in range(10):
                         self.send_next_layer(self.intermediate_queue, 'STOP', debug_mode)
                     break
@@ -124,6 +127,8 @@ class Scheduler:
                 input_image.append(self._process_frame(frame))
 
                 if len(input_image) == batch_frame:
+                    batches_processed += 1
+                    src.Log.log_debug(f"[Layer {self.layer_id}] Processing batch {batches_processed}")
                     y, batch_processing_time = self._process_batch(model, predictor, input_image, save_layers)
                     
                     time_inference += batch_processing_time
@@ -135,14 +140,17 @@ class Scheduler:
                         self.frame_metrics.update_input_frames(batch_frame)
                         self.frame_metrics.update_output_frames(batch_frame)
                     self._update_metrics(batch_frame, batch_processing_time, debug_mode)
-                    self.send_next_layer(self.intermediate_queue, y, debug_mode)
                     
+                    if debug_mode:
+                        src.Log.log_debug(f"[Layer {self.layer_id}] Batch {batches_processed} processed in {batch_processing_time:.3f}s")
+                    
+                    self.send_next_layer(self.intermediate_queue, y, debug_mode)
                     input_image = []
 
         finally:
             cap.release()
 
-        src.Log.log_info("End Inference.")
+        src.Log.log_info(f"[Layer {self.layer_id}] End Inference.")
         return time_inference
 
     def _process_received_data(self, received_data):
@@ -204,9 +212,6 @@ class Scheduler:
 
         src.Log.log_info("End Inference.")
         return self.time_inference
-
-    def middle_layer(self, model):
-        pass
 
     def inference_func(self, model, data, num_layers, save_layers, batch_frame, debug_mode=False, frame_metrics=None):
         time_inference = 0
