@@ -20,7 +20,6 @@ from ultralytics import YOLO
 import src.Log
 import src.Utils
 from src.Model import SplitDetectionModel
-from src.FrameMetrics import FrameMetrics
 
 class RpcClient:
     """ Khai báo các tham số của client """
@@ -128,8 +127,6 @@ class RpcClient:
 
         pretrain_model = YOLO(f"{model_name}.pt").model
         self.model = SplitDetectionModel(pretrain_model, split_layer=splits)
-        
-        self.frame_metrics = FrameMetrics(layer_id=self.layer_id, client_id=self.client_id)
 
         start_time = time.perf_counter()
         src.Log.print_with_color("Start Inference", "blue")
@@ -140,22 +137,16 @@ class RpcClient:
             num_layers,
             save_layers,
             batch_frame,
-            self.debug_mode,
-            self.frame_metrics
+            self.debug_mode
         )
         
         total_time = time.perf_counter() - start_time
-        metrics_summary = self.frame_metrics.get_metrics_summary()
 
         src.Log.print_with_color("","blue")
         src.Log.print_with_color("============================", "blue")
-        src.Log.print_with_color(f"Total input frames: {metrics_summary['input_frames']}", "blue")
-        src.Log.print_with_color(f"Total output frames: {metrics_summary['output_frames']}", "blue")
-        src.Log.print_with_color(f"Frame drop rate: {metrics_summary['drop_rate']}", "blue")
         src.Log.print_with_color(f"All time: {total_time:.2f}s", "blue")
         src.Log.print_with_color(f"Inference time: {inference_time:.2f}s", "blue")
         src.Log.print_with_color(f"Utilization: {((inference_time / total_time) * 100):.2f}%", "blue")
-        src.Log.print_with_color(f"Average FPS: {(metrics_summary['output_frames'] / total_time):.2f}", "blue")
         src.Log.print_with_color("============================", "blue")
 
     def wait_response(self) -> None:

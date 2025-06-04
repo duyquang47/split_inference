@@ -11,12 +11,11 @@ import socket
 import logging
 import tempfile
 import os
-from src.FPS import FPSMetrics
+from src.Metrics import Metrics
 import threading
 import queue
 import yaml
 import src.Log
-from src.FrameMetrics import FrameMetrics
 
 class Scheduler:
     def __init__(self, client_id, layer_id, channel, device):
@@ -27,8 +26,7 @@ class Scheduler:
         self.intermediate_queue = "intermediate_queue"
         self.channel.queue_declare(self.intermediate_queue, durable=False)
         self.local_queue = queue.Queue()
-        self.fps_metrics = FPSMetrics(layer_id, client_id)
-        self.frame_metrics = None  # Will be initialized in inference_func
+        self.metrics = Metrics(layer_id, client_id)
         self._setup_prometheus()
 
     def _setup_prometheus(self):
@@ -91,8 +89,8 @@ class Scheduler:
         return y, batch_processing_time
 
     def _update_metrics(self, batch_frame, batch_processing_time, debug_mode=False):
-        self.fps_metrics.update_batch_metrics(batch_frame, batch_processing_time)
-        self.fps_metrics.update_metrics(batch_frame, batch_processing_time, debug_mode)
+        self.metrics.update_batch_metrics(batch_frame, batch_processing_time)
+        self.metrics.update_fps_metrics(batch_frame, batch_processing_time, debug_mode)
 
     def first_layer(self, model, data, save_layers, batch_frame, debug_mode=False):
         src.Log.log_info(f"[Layer {self.layer_id}] Starting first layer processing with batch size {batch_frame}")
@@ -136,9 +134,6 @@ class Scheduler:
                     total_frames += batch_frame
 
                     # Update metrics for each batch
-                    if self.frame_metrics:
-                        self.frame_metrics.update_input_frames(batch_frame)
-                        self.frame_metrics.update_output_frames(batch_frame)
                     self._update_metrics(batch_frame, batch_processing_time, debug_mode)
                     
                     if debug_mode:
@@ -161,12 +156,17 @@ class Scheduler:
     def last_layer_callback(self, ch, method, properties, body):
         received_data = pickle.loads(body)
         self.local_queue.put(received_data)
+        # Update queue length metric
+        self.metrics.update_queue_length(self.local_queue.qsize())
         if received_data == 'STOP':
             ch.stop_consuming()
 
     def inference_worker(self):
         while True:
             received_data = self.local_queue.get()
+            # Update queue length metric after getting item
+            self.metrics.update_queue_length(self.local_queue.qsize())
+            
             if received_data == 'STOP':
                 break
 
@@ -181,9 +181,6 @@ class Scheduler:
             self.total_frames += self.batch_frame
             
             # Update metrics for each batch
-            if self.frame_metrics:
-                self.frame_metrics.update_output_frames(self.batch_frame)
-                self.frame_metrics.update_input_frames(self.batch_frame)
             self._update_metrics(self.batch_frame, batch_processing_time, self.debug_mode)
 
     def last_layer(self, model, batch_frame, debug_mode=False):
@@ -213,9 +210,8 @@ class Scheduler:
         src.Log.log_info("End Inference.")
         return self.time_inference
 
-    def inference_func(self, model, data, num_layers, save_layers, batch_frame, debug_mode=False, frame_metrics=None):
+    def inference_func(self, model, data, num_layers, save_layers, batch_frame, debug_mode=False):
         time_inference = 0
-        self.frame_metrics = frame_metrics  # Use the frame_metrics passed from RpcClient
         if self.layer_id == 1:
             time_inference = self.first_layer(model, data, save_layers, batch_frame, debug_mode)
         elif self.layer_id == num_layers:
