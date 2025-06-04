@@ -40,25 +40,27 @@ class Metrics:
         )
 
         # Initialize system metrics
-        self.cpu_usage = Gauge(
-            f'layer_{layer_id}_cpu_usage_percent',
-            f'CPU usage percentage for layer {layer_id}',
-            ['client_id']
-        )
-        self.ram_usage = Gauge(
-            f'layer_{layer_id}_ram_usage_percent',
-            f'RAM usage percentage for layer {layer_id}',
-            ['client_id']
-        )
+        # self.cpu_usage = Gauge(
+        #     f'layer_{layer_id}_cpu_usage_percent',
+        #     f'CPU usage percentage for layer {layer_id}',
+        #     ['client_id']
+        # )
+        # self.ram_usage = Gauge(
+        #     f'layer_{layer_id}_ram_usage_percent',
+        #     f'RAM usage percentage for layer {layer_id}',
+        #     ['client_id']
+        # )
 
         # Initialize metrics with default values
         self.fps_metric.labels(client_id=self.client_id).set(0)
         self.frame_counter.labels(client_id=self.client_id).inc(0)
         self.batch_processing_time.labels(client_id=self.client_id).set(0)
         self.layer_processing_time.labels(client_id=self.client_id).inc(0)
+        
         self.queue_length.labels(client_id=self.client_id).set(0)
-        self.cpu_usage.labels(client_id=self.client_id).set(0)
-        self.ram_usage.labels(client_id=self.client_id).set(0)
+        
+        # self.cpu_usage.labels(client_id=self.client_id).set(0)
+        # self.ram_usage.labels(client_id=self.client_id).set(0)
 
         # Initialize counters
         self.window_start_time = time.time()
@@ -67,27 +69,27 @@ class Metrics:
         self.total_frames = 0
 
         # Start system metrics collection in background
-        self._start_system_metrics_collection()
+        # self._start_system_metrics_collection()
 
-    def _start_system_metrics_collection(self):
-        """Start system metrics collection in background thread"""
-        def collect_metrics():
-            while True:
-                try:
-                    # Get CPU usage without blocking
-                    cpu_percent = psutil.cpu_percent(interval=None)
-                    self.cpu_usage.labels(client_id=self.client_id).set(cpu_percent)
+    # def _start_system_metrics_collection(self):
+    #     """Start system metrics collection in background thread"""
+    #     def collect_metrics():
+    #         while True:
+    #             try:
+    #                 # Get CPU usage without blocking
+    #                 cpu_percent = psutil.cpu_percent(interval=None)
+    #                 self.cpu_usage.labels(client_id=self.client_id).set(cpu_percent)
 
-                    # Get RAM usage
-                    ram_percent = psutil.virtual_memory().percent
-                    self.ram_usage.labels(client_id=self.client_id).set(ram_percent)
-                except Exception as e:
-                    src.Log.log_error(f"Error updating system metrics: {str(e)}")
-                time.sleep(5)  # Update every 5 seconds
+    #                 # Get RAM usage
+    #                 ram_percent = psutil.virtual_memory().percent
+    #                 self.ram_usage.labels(client_id=self.client_id).set(ram_percent)
+    #             except Exception as e:
+    #                 src.Log.log_error(f"Error updating system metrics: {str(e)}")
+    #             time.sleep(5)  # Update every 5 seconds
 
-        # Start collection in background thread
-        thread = threading.Thread(target=collect_metrics, daemon=True)
-        thread.start()
+    #     # Start collection in background thread
+    #     thread = threading.Thread(target=collect_metrics, daemon=True)
+    #     thread.start()
 
     def update_fps_metrics(self, batch_frame, batch_processing_time, debug_mode=False):
         """Update FPS metrics"""
