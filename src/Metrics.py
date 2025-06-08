@@ -55,6 +55,11 @@ class Metrics:
             f'RAM usage in bytes for layer {layer_id}',
             ['client_id']
         )
+        self.ram_usage_mb = Gauge(
+            f'layer_{layer_id}_ram_usage_mb',
+            f'RAM usage in MB for layer {layer_id}',
+            ['client_id']
+        )
 
         # Initialize metrics with default values
         self.fps_metric.labels(client_id=self.client_id).set(0)
@@ -67,6 +72,7 @@ class Metrics:
         self.cpu_usage.labels(client_id=self.client_id).set(0)
         self.ram_usage.labels(client_id=self.client_id).set(0)
         self.ram_usage_bytes.labels(client_id=self.client_id).set(0)
+        self.ram_usage_mb.labels(client_id=self.client_id).set(0)
 
         # Initialize counters
         self.window_start_time = time.time()
@@ -94,10 +100,11 @@ class Metrics:
                     ram_percent = (memory_info.rss / psutil.virtual_memory().total) * 100
                     self.ram_usage.labels(client_id=self.client_id).set(ram_percent)
                     self.ram_usage_bytes.labels(client_id=self.client_id).set(memory_info.rss)
+                    self.ram_usage_mb.labels(client_id=self.client_id).set(memory_info.rss / (1024 * 1024))  # Convert bytes to MB
                     
                 except Exception as e:
                     src.Log.log_error(f"Error updating system metrics: {str(e)}")
-                time.sleep(2)  # Update every 2 seconds - good balance between accuracy and resource usage
+                time.sleep(1)  # Update every 1 seconds - good balance between accuracy and resource usage
 
         # Start collection in background thread
         thread = threading.Thread(target=collect_metrics, daemon=True)
