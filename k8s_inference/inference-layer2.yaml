@@ -5,7 +5,7 @@ metadata:
   labels:
     app: split-inference-layer2
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: split-inference-layer2
@@ -21,9 +21,9 @@ spec:
     spec:
       containers:
       - name: layer2
-        image: quang47/inference_client
-        imagePullPolicy: IfNotPresent
-        command: ["/bin/sh", "-c", "sleep 20 && python client.py --layer_id 2 --device cpu"]
+        image: quang47/inference_client:v5
+        imagePullPolicy: Always
+        command: ["python", "client.py", "--layer_id", "2", "--device", "cpu"]
         ports:
         - containerPort: 8002
           name: metrics
@@ -36,10 +36,12 @@ spec:
         env:
         - name: PYTHONPATH
           value: "/app"
+        - name: PROMETHEUS_PORT
+          value: "8002"
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "300m"
+            memory: "800Mi"
+            cpu: "600m"
           limits:
             memory: "2Gi"
             cpu: "2"

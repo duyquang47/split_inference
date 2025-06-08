@@ -13,20 +13,13 @@ spec:
     metadata:
       labels:
         app: split-inference-server
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8000"
-        prometheus.io/path: "/metrics"
-        prometheus.io/scheme: "http"
     spec:
       containers:
       - name: server
-        image: quang47/inference_server
-        imagePullPolicy: IfNotPresent
-        command: ["/bin/sh", "-c", "sleep 10 && python server.py"]
+        image: quang47/inference_server:v5
+        imagePullPolicy: Always
+        command: ["python", "server.py"]
         ports:
-        - containerPort: 8000
-          name: metrics
         - containerPort: 5672
           name: amqp
         volumeMounts:
@@ -40,11 +33,11 @@ spec:
           value: "/app"
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "300m"
+            memory: "300Mi"
+            cpu: "200m"
           limits:
-            memory: "2Gi"
-            cpu: "800m"
+            memory: "500Mi"
+            cpu: "300m"
       volumes:
       - name: config-volume
         configMap:
@@ -58,18 +51,10 @@ metadata:
   name: split-inference-server
   labels:
     app: split-inference-server
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "8000"
-    prometheus.io/path: "/metrics"
-    prometheus.io/scheme: "http"
 spec:
   selector:
     app: split-inference-server
   ports:
-  - port: 8000
-    targetPort: 8000
-    name: metrics
   - port: 5672
     targetPort: 5672
     name: amqp

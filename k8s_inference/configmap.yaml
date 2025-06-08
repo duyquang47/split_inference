@@ -8,8 +8,8 @@ data:
     server:
       cut-layer: a #or b, c
       clients:
-        - 2
-        - 2
+        - 1
+        - 1
       model: yolov8n
       batch-frame: 1
     rabbit:
@@ -18,7 +18,7 @@ data:
       password: admin
       virtual-host: /
 
-    data: /app/video.mp4
+    data: http://video-server:5000/video
     log-path: .
     control-count: 10
     debug-mode: False
