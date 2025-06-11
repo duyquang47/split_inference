@@ -1,0 +1,45 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: client-layer2-scaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: split-inference-layer2 
+  pollingInterval: 15  
+  cooldownPeriod: 120
+  minReplicaCount: 1   
+  maxReplicaCount: 3 
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring.svc.cluster.local:9090
+      metricName: local_queue_length_trigger
+      query: |
+        layer_2_local_queue_length{job="split-inference-layer2"}
+      threshold: '100'
+  advanced:
+    horizontalPodAutoscalerConfig:
+      name: split-inference-layer2-keda
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+          - type: Pods
+            value: 2
+            periodSeconds: 15
+          selectPolicy: Max
+        scaleDown:
+          stabilizationWindowSeconds: 120
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+          - type: Pods
+            value: 1
+            periodSeconds: 15
