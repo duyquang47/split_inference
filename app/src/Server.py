@@ -42,7 +42,8 @@ class Server:
             "address": config["rabbit"]["address"],
             "username": config["rabbit"]["username"],
             "password": config["rabbit"]["password"],
-            "virtual_host": config["rabbit"]["virtual-host"]
+            "virtual_host": config["rabbit"]["virtual-host"],
+            "prefetch-count": config["rabbit"]["prefetch-count"]
         }
 
     def _setup_connection(self):
@@ -64,7 +65,7 @@ class Server:
             """ Main channel for receiving requests """
             self.channel = self.connection.channel()
             self.channel.queue_declare(queue='rpc_queue')
-            self.channel.basic_qos(prefetch_count=1)
+            self.channel.basic_qos(prefetch_count=self.rabbit_config["prefetch-count"])
             self.channel.basic_consume(
                 queue='rpc_queue',
                 on_message_callback=self.on_request

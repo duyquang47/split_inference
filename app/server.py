@@ -20,7 +20,7 @@ def load_config():
 def signal_handler(sig, frame):
     src.Log.log_info("Received stop signal (Ctrl+C). Cleaning up...")
     try:
-        delete_old_queues(address, username, password, virtual_host)
+        delete_old_queues(address, username, password, virtual_host, prefetch_count)
         src.Log.log_success("Cleanup completed successfully")
     except Exception as e:
         src.Log.log_error(f"Error during cleanup: {e}")
@@ -33,9 +33,10 @@ if __name__ == "__main__":
         username = config["rabbit"]["username"]
         password = config["rabbit"]["password"]
         virtual_host = config["rabbit"]["virtual-host"]
+        prefetch_count = config["rabbit"]["prefetch-count"]
 
         signal.signal(signal.SIGINT, signal_handler)
-        delete_old_queues(address, username, password, virtual_host)
+        delete_old_queues(address, username, password, virtual_host, prefetch_count)
         
         server = Server(config)
         server.start()

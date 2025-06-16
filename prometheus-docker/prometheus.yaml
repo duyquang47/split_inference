@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 2s
+
+scrape_configs:
+
+  - job_name: 'split_inference_layer'
+    static_configs:
+      - targets: ['client_layer1:8001', 'client_layer2:8002']

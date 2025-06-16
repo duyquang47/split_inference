@@ -61,6 +61,7 @@ def setup_rabbitmq_connection(config):
             )
         )
         channel = connection.channel()
+        channel.basic_qos(prefetch_count=config["rabbit"]["prefetch-count"])
         return channel
     except pika.exceptions.AMQPConnectionError as e:
         src.Log.log_error(f"Failed to connect to RabbitMQ: {e}")
@@ -85,7 +86,7 @@ def main():
         
         """ Initialize and start client """
         src.Log.log_info("Initializing client...")
-        scheduler = Scheduler(client_id, args.layer_id, channel, device)
+        scheduler = Scheduler(client_id, args.layer_id, channel, device, config)
         client = RpcClient(
             client_id,
             args.layer_id,
@@ -94,7 +95,8 @@ def main():
             config["rabbit"]["password"],
             config["rabbit"]["virtual-host"],
             scheduler.inference_func,
-            device
+            device,
+            config["rabbit"]["prefetch-count"]
         )
         
         src.Log.log_info("Sending registration message to server...")

@@ -27,8 +27,8 @@ services:
 
   server:
     build:
-      context: .
-      dockerfile: Dockerfile.server
+      context: ..
+      dockerfile: docker/Dockerfile.server
     container_name: server
     depends_on:
       - rabbitmq
@@ -42,15 +42,15 @@ services:
       - VIDEO_SERVER_URL=http://video_server:5000/video
       - PYTHONUNBUFFERED=1
     volumes:
-      - ./config.yaml:/app/config.yaml
+      - ../app/config.yaml:/app/config.yaml
     networks:
       - inference
     command: ["sh", "-c", "sleep 10 && python server.py"]
 
   client_layer1:
     build:
-      context: .
-      dockerfile: Dockerfile.client
+      context: ..
+      dockerfile: docker/Dockerfile.client
     container_name: client_layer1
     ports:
       - "8001:8001"
@@ -66,15 +66,15 @@ services:
       - PYTHONUNBUFFERED=1
       - PROMETHEUS_PORT=8001
     volumes:
-      - ./config.yaml:/app/config.yaml
+      - ../app/config.yaml:/app/config.yaml
     networks:
       - inference
     command: ["sh", "-c", "sleep 20 && python client.py --layer_id 1 --device cpu"]
 
   client_layer2:
     build:
-      context: .
-      dockerfile: Dockerfile.client
+      context: ..
+      dockerfile: docker/Dockerfile.client
     container_name: client_layer2
     ports:
       - "8002:8002"
@@ -90,7 +90,7 @@ services:
       - PYTHONUNBUFFERED=1
       - PROMETHEUS_PORT=8002
     volumes:
-      - ./config.yaml:/app/config.yaml
+      - ../app/config.yaml:/app/config.yaml
     networks:
       - inference
     command: ["sh", "-c", "sleep 20 && python client.py --layer_id 2 --device cpu"]
@@ -100,7 +100,7 @@ services:
     image: prom/prometheus
     container_name: prometheus
     volumes:
-      - ../prometheus-docker/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../prometheus-docker/prometheus.yml:/etc/prometheus/prometheus.yaml
     ports:
       - "9090:9090"
     networks:

@@ -32,7 +32,8 @@ class RpcClient:
         password: str,
         virtual_host: str,
         inference_func: Callable,
-        device: str
+        device: str,
+        prefetch_count: int = 1
     ):
         """ Gán giá trị cho các biến """
         self.client_id = client_id
@@ -43,6 +44,7 @@ class RpcClient:
         self.virtual_host = virtual_host
         self.inference_func = inference_func
         self.device = device
+        self.prefetch_count = prefetch_count
 
         self.channel: Optional[pika.channel.Channel] = None
         self.connection: Optional[pika.connection.Connection] = None
@@ -61,7 +63,8 @@ class RpcClient:
                 self.address,
                 self.username,
                 self.password,
-                self.virtual_host
+                self.virtual_host,
+                self.prefetch_count
             )
         except Exception as e:
             src.Log.print_with_color(f"Failed to connect to RabbitMQ: {str(e)}", "red")

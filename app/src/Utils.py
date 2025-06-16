@@ -9,7 +9,8 @@ def create_connection(
     address: str,
     username: str,
     password: str,
-    virtual_host: str
+    virtual_host: str,
+    prefetch_count: int
 ) -> Tuple[pika.BlockingConnection, pika.channel.Channel]:
 
     """ Tạo kết nối đến RabbitMQ server """
@@ -23,16 +24,17 @@ def create_connection(
         )
     )
     channel = connection.channel()
+    channel.basic_qos(prefetch_count=prefetch_count)
     """ Return tupple chứa connection và channel """
     return connection, channel
 
-def delete_old_queues(address: str, username: str, password: str, virtual_host: str) -> bool:
+def delete_old_queues(address: str, username: str, password: str, virtual_host: str, prefetch_count: int = 1) -> bool:
     url = f'http://{address}:15672/api/queues'
     response = requests.get(url, auth=HTTPBasicAuth(username, password))
 
     if response.status_code == 200:
         queues = response.json()
-        connection, channel = create_connection(address, username, password, virtual_host)
+        connection, channel = create_connection(address, username, password, virtual_host, prefetch_count)
 
         for queue in queues:
             queue_name = queue['name']

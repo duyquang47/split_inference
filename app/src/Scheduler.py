@@ -18,11 +18,12 @@ import yaml
 import src.Log
 
 class Scheduler:
-    def __init__(self, client_id, layer_id, channel, device):
+    def __init__(self, client_id, layer_id, channel, device, config):
         self.client_id = client_id
         self.layer_id = layer_id
         self.channel = channel
         self.device = device
+        self.config = config
         self.intermediate_queue = "intermediate_queue"
         self.channel.queue_declare(self.intermediate_queue, durable=False)
         self.local_queue = queue.Queue()
@@ -196,7 +197,7 @@ class Scheduler:
 
         last_queue = "intermediate_queue"
         self.channel.queue_declare(queue=last_queue, durable=False)
-        self.channel.basic_qos(prefetch_count=50)
+        self.channel.basic_qos(prefetch_count=self.config["rabbit"]["prefetch-count"])
         self.channel.basic_consume(
             queue=last_queue,
             on_message_callback=self.last_layer_callback,

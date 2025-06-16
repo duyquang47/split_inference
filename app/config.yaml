@@ -11,8 +11,8 @@ rabbit:
   username: admin
   password: admin
   virtual-host: /
+  prefetch-count: 5
 
 data: http://video-server.default.svc.cluster.local:5000/video
 log-path: .
-control-count: 10
 debug-mode: False

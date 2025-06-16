@@ -4,8 +4,8 @@ WORKDIR /app
 
 RUN pip install flask
 
-COPY video.mp4 .
-COPY video_server.py .
+COPY ./video.mp4 .
+COPY ./app/video_server.py .
 
 EXPOSE 5000
 

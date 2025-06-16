@@ -11,13 +11,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY ../app/ .
 
 #install dung thu tu de giam kich thuoc image
 RUN pip install --no-cache-dir torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 RUN curl -L -o yolov8n.pt https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt
 
-COPY . .
+EXPOSE 5672
 
 ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "server.py"]
